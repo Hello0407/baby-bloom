@@ -11,6 +11,23 @@ const DEFAULT_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 let allProducts = [];
 let currentFilter = 'all';
 
+function normalizeSizes(sizes) {
+  if (!Array.isArray(sizes)) return [];
+  return sizes
+    .map(s => ({ size: String(s.size || '').trim(), qty: Math.max(0, parseInt(s.qty, 10) || 0) }))
+    .filter(s => s.size);
+}
+
+function getAvailableSizes(sizes) {
+  return normalizeSizes(sizes).filter(s => s.qty > 0);
+}
+
+function formatSizesText(sizes) {
+  const available = getAvailableSizes(sizes);
+  if (!available.length) return '';
+  return available.map(s => s.size).join(' · ');
+}
+
 // Загрузка товаров из Supabase
 async function loadProducts() {
   const grid = document.getElementById('products-grid');
@@ -53,6 +70,7 @@ function renderProducts() {
     if (p.status === 'preorder') { badgeText = 'Предзаказ'; badgeClass = 'badge-preorder'; }
 
     const mainImg = (p.images && p.images.length > 0 && p.images[0]) ? p.images[0] : DEFAULT_IMAGE;
+    const sizesText = formatSizesText(p.sizes);
 
     return `
       <div class="product-card" onclick='openModalById(${p.id})'>
@@ -62,6 +80,7 @@ function renderProducts() {
         </div>
         <div class="card-content">
           <div class="card-title">${p.title || ''}</div>
+          ${sizesText ? `<div class="card-sizes">${sizesText}</div>` : ''}
           <div class="card-price">${p.price || ''}</div>
         </div>
       </div>
@@ -110,6 +129,21 @@ window.openModalById = function(id) {
   const priceEl = document.getElementById('modal-price');
   if (priceEl) priceEl.innerText = product.price || '';
 
+  const sizesEl = document.getElementById('modal-sizes');
+  const sizesWrap = document.getElementById('modal-sizes-wrap');
+  if (sizesEl && sizesWrap) {
+    const available = getAvailableSizes(product.sizes);
+    if (available.length) {
+      sizesEl.innerHTML = available.map(s =>
+        `<span class="size-tag">${s.size}</span>`
+      ).join('');
+      sizesWrap.style.display = 'block';
+    } else {
+      sizesEl.innerHTML = '';
+      sizesWrap.style.display = 'none';
+    }
+  }
+
   const descEl = document.getElementById('modal-description');
   if (descEl) descEl.innerText = product.description || 'Описание отсутствует';
 
@@ -130,7 +164,9 @@ window.openModalById = function(id) {
   // Ссылка в Instagram
   const igLink = document.getElementById('modal-ig-link');
   if (igLink) {
-    const text = encodeURIComponent(`Здравствуйте! Хочу заказать: "${product.title}" (${product.price})`);
+    const sizesNote = formatSizesText(product.sizes);
+    const sizePart = sizesNote ? `, размер: ${sizesNote}` : '';
+    const text = encodeURIComponent(`Здравствуйте! Хочу заказать: "${product.title}" (${product.price}${sizePart})`);
     igLink.href = `https://ig.me/m/${INSTAGRAM_USERNAME}?text=${text}`;
   }
 

@@ -16,10 +16,24 @@
     .btn-submit { width: 100%; background: var(--accent-color); color: #fff; border: none; padding: 14px; border-radius: 30px; font-size: 15px; font-weight: 600; cursor: pointer; }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn-cancel { width: 100%; background: #ccc; color: #000; border: none; padding: 10px; border-radius: 30px; font-size: 14px; margin-top: 8px; cursor: pointer; display: none; }
-    .admin-product-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
-    .action-btns { display: flex; gap: 8px; }
+    .admin-product-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; }
+    .admin-product-info { flex: 1; min-width: 180px; }
+    .admin-product-info small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+    .action-btns { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; }
     .btn-edit { background: #3b82f6; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
     .btn-delete { background: #ff4d4d; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+    .inline-sizes { display: flex; flex-direction: column; gap: 6px; margin-right: 8px; }
+    .inline-size-row { display: flex; align-items: center; gap: 4px; }
+    .inline-size-input { width: 72px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 11px; background: var(--bg-color); }
+    .qty-btn { width: 24px; height: 24px; border: 1px solid var(--border-color); background: var(--bg-color); border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1; color: var(--text-main); }
+    .qty-btn:hover { background: var(--border-color); }
+    .qty-value { min-width: 20px; text-align: center; font-size: 12px; font-weight: 600; }
+    .size-form-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+    .size-form-row { display: flex; gap: 8px; align-items: center; }
+    .size-form-row input[type="text"] { flex: 1; }
+    .size-form-row input[type="number"] { width: 80px; }
+    .btn-add-size { background: transparent; border: 1px dashed var(--border-color); color: var(--text-muted); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; width: 100%; }
+    .btn-remove-size { background: transparent; border: none; color: #ff4d4d; cursor: pointer; font-size: 18px; padding: 0 4px; line-height: 1; }
   </style>
 </head>
 <body>
@@ -54,6 +68,12 @@
       </div>
 
       <div class="form-group">
+        <label>Размеры и количество</label>
+        <div id="size-form-rows" class="size-form-rows"></div>
+        <button type="button" class="btn-add-size" onclick="addSizeFormRow()">+ Добавить размер</button>
+      </div>
+
+      <div class="form-group">
         <label>Фотографии товара (необязательно)</label>
         <input type="file" id="p-files" class="form-control" accept="image/*" multiple>
         <small id="files-note" style="color: #666; font-size: 11px; display: none;">Оставьте пустым, чтобы сохранить текущие фото</small>
@@ -81,6 +101,129 @@
 
     let allProducts = [];
 
+    function normalizeSizes(sizes) {
+      if (!Array.isArray(sizes)) return [];
+      return sizes.map(s => ({
+        size: String(s.size || '').trim(),
+        qty: Math.max(0, parseInt(s.qty, 10) || 0)
+      })).filter(s => s.size);
+    }
+
+    function getAvailableSizes(sizes) {
+      return normalizeSizes(sizes).filter(s => s.qty > 0);
+    }
+
+    function shouldBePreorder(sizes) {
+      const list = normalizeSizes(sizes);
+      return list.length > 0 && list.every(s => s.qty === 0);
+    }
+
+    function renderSizeFormRows(sizes = []) {
+      const container = document.getElementById('size-form-rows');
+      const list = normalizeSizes(sizes);
+      container.innerHTML = '';
+
+      if (!list.length) {
+        addSizeFormRow('', 1);
+        return;
+      }
+
+      list.forEach(s => addSizeFormRow(s.size, s.qty));
+    }
+
+    function addSizeFormRow(size = '', qty = 1) {
+      const container = document.getElementById('size-form-rows');
+      const row = document.createElement('div');
+      row.className = 'size-form-row';
+      row.innerHTML = `
+        <input type="text" class="form-control size-input" placeholder="62 см" value="${size}">
+        <input type="number" class="form-control qty-input" min="0" value="${qty}">
+        <button type="button" class="btn-remove-size" onclick="this.parentElement.remove()" title="Удалить">&times;</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function readSizeFormRows() {
+      const rows = document.querySelectorAll('#size-form-rows .size-form-row');
+      const sizes = [];
+      rows.forEach(row => {
+        const size = row.querySelector('.size-input').value.trim();
+        const qty = Math.max(0, parseInt(row.querySelector('.qty-input').value, 10) || 0);
+        if (size) sizes.push({ size, qty });
+      });
+      return sizes;
+    }
+
+    function renderInlineSizes(product) {
+      const sizes = normalizeSizes(product.sizes);
+      if (!sizes.length) return '';
+
+      return `
+        <div class="inline-sizes">
+          ${sizes.map((s, index) => `
+            <div class="inline-size-row">
+              <input type="text" class="inline-size-input" value="${s.size}"
+                onchange="updateSizeText(${product.id}, ${index}, this.value)">
+              <button type="button" class="qty-btn" onclick="changeQty(${product.id}, ${index}, -1)">−</button>
+              <span class="qty-value">${s.qty}</span>
+              <button type="button" class="qty-btn" onclick="changeQty(${product.id}, ${index}, 1)">+</button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    async function saveProductSizes(id, sizes) {
+      const product = allProducts.find(p => p.id === id);
+      if (!product) return;
+
+      const normalized = normalizeSizes(sizes);
+      const updateData = { sizes: normalized };
+
+      if (shouldBePreorder(normalized)) {
+        updateData.status = 'preorder';
+      } else if (product.status === 'preorder' && getAvailableSizes(normalized).length > 0) {
+        updateData.status = 'in_stock';
+      }
+
+      const { error } = await supabaseClient
+        .from('products')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        alert('Ошибка сохранения: ' + error.message);
+        return;
+      }
+
+      loadAdminProducts();
+    }
+
+    window.changeQty = function(id, index, delta) {
+      const product = allProducts.find(p => p.id === id);
+      if (!product) return;
+
+      const sizes = normalizeSizes(product.sizes);
+      if (!sizes[index]) return;
+
+      sizes[index].qty = Math.max(0, sizes[index].qty + delta);
+      saveProductSizes(id, sizes);
+    };
+
+    window.updateSizeText = function(id, index, newSize) {
+      const product = allProducts.find(p => p.id === id);
+      if (!product) return;
+
+      const sizes = normalizeSizes(product.sizes);
+      if (!sizes[index]) return;
+
+      const trimmed = newSize.trim();
+      if (!trimmed) return;
+
+      sizes[index].size = trimmed;
+      saveProductSizes(id, sizes);
+    };
+
     async function loadAdminProducts() {
       const listEl = document.getElementById('admin-list');
       const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending: false });
@@ -96,10 +239,12 @@
 
         return `
           <div class="admin-product-item">
-            <div>
+            <div class="admin-product-info">
               <strong>${p.title}</strong> — ${p.price} (${statusText})
+              ${normalizeSizes(p.sizes).length ? `<small>Размеры: ${normalizeSizes(p.sizes).map(s => `${s.size} (${s.qty})`).join(', ')}</small>` : ''}
             </div>
             <div class="action-btns">
+              ${renderInlineSizes(p)}
               <button class="btn-edit" onclick="editProduct(${p.id})">Изм.</button>
               <button class="btn-delete" onclick="deleteProduct(${p.id})">Уд.</button>
             </div>
@@ -117,6 +262,7 @@
       document.getElementById('p-price').value = product.price || '';
       document.getElementById('p-status').value = product.status || 'in_stock';
       document.getElementById('p-desc').value = product.description || '';
+      renderSizeFormRows(product.sizes || []);
 
       document.getElementById('form-title').innerText = "Редактирование товара";
       document.getElementById('submit-btn').innerText = "Сохранить изменения";
@@ -129,6 +275,7 @@
     function resetForm() {
       document.getElementById('edit-product-id').value = '';
       document.getElementById('add-product-form').reset();
+      renderSizeFormRows([]);
       document.getElementById('form-title').innerText = "Добавить новый товар";
       document.getElementById('submit-btn').innerText = "Опубликовать товар";
       document.getElementById('cancel-btn').style.display = "none";
@@ -176,13 +323,19 @@
           }
         }
 
+        const sizes = readSizeFormRows();
         const productData = {
           title: document.getElementById('p-title').value,
           price: document.getElementById('p-price').value,
           status: document.getElementById('p-status').value,
           images: uploadedImageUrls,
-          description: document.getElementById('p-desc').value
+          description: document.getElementById('p-desc').value,
+          sizes: sizes
         };
+
+        if (shouldBePreorder(sizes)) {
+          productData.status = 'preorder';
+        }
 
         if (editId) {
           const { error: updateError } = await supabaseClient
@@ -218,6 +371,7 @@
     }
 
     loadAdminProducts();
+    renderSizeFormRows([]);
   </script>
 </body>
 </html>

@@ -172,6 +172,32 @@ body {
   margin-top: auto;
 }
 
+.card-sizes {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.modal-sizes-wrap {
+  margin-bottom: 16px;
+}
+
+.modal-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.size-tag {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
 /* Модальное окно */
 .modal-backdrop {
   position: fixed;
