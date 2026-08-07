@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baby Bloom — Панель администратора</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .admin-container { max-width: 600px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 20px; border: 1px solid var(--border-color); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-main); }
+    .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 14px; background: var(--bg-color); }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+    
+    /* Стили для поля загрузки файлов */
+    input[type="file"].form-control {
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    .btn-submit { width: 100%; background: var(--accent-color); color: #fff; border: none; padding: 14px; border-radius: 30px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .admin-product-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+    .btn-delete { background: #ff4d4d; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="logo">BABY BLOOM</div>
+    <div class="tagline">Админ-панель магазина</div>
+  </header>
+
+  <div class="admin-container">
+    <h2 style="margin-bottom: 20px; font-size: 18px;">Добавить новый товар</h2>
+    <form id="add-product-form">
+      <div class="form-group">
+        <label>Название товара</label>
+        <input type="text" id="p-title" class="form-control" placeholder="Например: Вязаный комбинезон" required>
+      </div>
+      
+      <div class="form-group">
+        <label>Цена (с валютой)</label>
+        <input type="text" id="p-price" class="form-control" placeholder="Например: 250 TJS" required>
+      </div>
+
+      <div class="form-group">
+        <label>Статус наличия</label>
+        <select id="p-status" class="form-control">
+          <option value="in_stock">🟢 В наличии</option>
+          <option value="preorder">🟡 Предзаказ</option>
+        </select>
+      </div>
+
+      <!-- Заменили текстовое поле на выбор файлов из устройства -->
+      <div class="form-group">
+        <label>Фотографии товара (выберите файлы с устройства)</label>
+        <input type="file" id="p-files" class="form-control" accept="image/*" multiple required>
+      </div>
+
+      <div class="form-group">
+        <label>Описание товара</label>
+        <textarea id="p-desc" class="form-control" placeholder="Укажите состав, размеры и детали..."></textarea>
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn-submit">Опубликовать товар</button>
+    </form>
+  </div>
+
+  <div class="admin-container">
+    <h2 style="margin-bottom: 20px; font-size: 18px;">Список товаров на сайте</h2>
+    <div id="admin-list">Загрузка...</div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://pwkwtulyvwvxddtniidg.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_aVaAogTKMyIeSX181EF2nA_CxxU-1eH";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Загрузка товаров в список админки
+    async function loadAdminProducts() {
+      const listEl = document.getElementById('admin-list');
+      const { data, error } = await supabase.from('products').select('*').order('id', { ascending: false });
+      
+      if (error) { listEl.innerText = "Ошибка загрузки"; return; }
+      if (!data.length) { listEl.innerText = "Товаров пока нет"; return; }
+
+      listEl.innerHTML = data.map(p => `
+        <div class="admin-product-item">
+          <div>
+            <strong>${p.title}</strong> — ${p.price} (${p.status === 'in_stock' ? 'В наличии' : 'Предзаказ'})
+          </div>
+          <button class="btn-delete" onclick="deleteProduct(${p.id})">Удалить</button>
+        </div>
+      `).join('');
+    }
+
+    // Обработка отправки формы
+    document.getElementById('add-product-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('submit-btn');
+      const fileInput = document.getElementById('p-files');
+      const files = fileInput.files;
+
+      if (!files.length) {
+        alert("Пожалуйста, выберите хотя бы одно фото!");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Загрузка фото...";
+
+      try {
+        const uploadedImageUrls = [];
+
+        // Загрузка каждого выбранного файла в Supabase Storage
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+          const filePath = `${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, file);
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          // Получаем публичную ссылку на загруженное фото
+          const { data: urlData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
+
+          uploadedImageUrls.push(urlData.publicUrl);
+        }
+
+        submitBtn.innerText = "Сохранение товара...";
+
+        // Сохраняем товар в базе данных
+        const newProduct = {
+          title: document.getElementById('p-title').value,
+          price: document.getElementById('p-price').value,
+          status: document.getElementById('p-status').value,
+          images: uploadedImageUrls,
+          description: document.getElementById('p-desc').value
+        };
+
+        const { error: insertError } = await supabase.from('products').insert([newProduct]);
+
+        if (insertError) throw insertError;
+
+        alert("Товар успешно добавлен с фото!");
+        document.getElementById('add-product-form').reset();
+        loadAdminProducts();
+
+      } catch (err) {
+        alert("Ошибка при загрузке: " + err.message);
+        console.error(err);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Опубликовать товар";
+      }
+    });
+
+    // Удаление товара
+    async function deleteProduct(id) {
+      if (confirm("Точно удалить этот товар?")) {
+        await supabase.from('products').delete().eq('id', id);
+        loadAdminProducts();
+      }
+    }
+
+    loadAdminProducts();
+  </script>
+</body>
+</html>
