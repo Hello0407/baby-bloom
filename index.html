@@ -3,35 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Baby Bloom — Детская одежда</title>
+  <title>Baby Bloom — Minimal Baby Store</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Supabase SDK JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- Шапка сайта -->
+  <!-- Шапка -->
   <header class="header">
     <div class="logo">BABY BLOOM</div>
     <div class="tagline">Одежда и товары для малышей</div>
   </header>
 
-  <!-- Кнопки фильтрации -->
-  <div class="filters">
-    <button class="filter-btn active" data-filter="all">Все товары</button>
-    <button class="filter-btn" data-filter="in_stock">В наличии</button>
-    <button class="filter-btn" data-filter="sale">По акции</button>
-    <button class="filter-btn" data-filter="preorder">Предзаказ</button>
-  </div>
-
-  <!-- Сетка товаров -->
   <main class="container">
-    <div id="product-grid" class="product-grid">
-      <!-- Товары загружаются из Supabase через app.js -->
-      <p style="text-align:center; grid-column: 1/-1; padding: 40px 0; color: #888;">Загрузка товаров...</p>
+    <!-- Переключатель категорий/статусов -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="filterProducts('all', this)">Все товары</button>
+      <button class="tab-btn" onclick="filterProducts('in_stock', this)">В наличии</button>
+      <button class="tab-btn" onclick="filterProducts('sale', this)">По акции</button>
+      <button class="tab-btn" onclick="filterProducts('preorder', this)">Предзаказ</button>
+    </div>
+
+    <!-- Сетка товаров -->
+    <div class="products-grid" id="products-grid">
+      <div class="loading">Загрузка товаров...</div>
     </div>
   </main>
 
-  <!-- Подключение JS -->
+  <!-- Модальное окно карточки товара -->
+  <div class="modal-backdrop" id="modal" onclick="closeModal(event)">
+    <div class="modal-card">
+      <button class="close-btn" onclick="closeModalDirect()">&times;</button>
+      
+      <!-- Галерея фото -->
+      <div class="modal-gallery">
+        <img id="modal-main-img" class="modal-main-img" src="" alt="Товар">
+        <div class="modal-thumbnails" id="modal-thumbnails"></div>
+      </div>
+
+      <!-- Информация о товаре -->
+      <div class="modal-info">
+        <span class="badge" id="modal-badge"></span>
+        <h2 id="modal-title"></h2>
+        <div class="price" id="modal-price"></div>
+        <div class="description-title">Описание</div>
+        <p class="description" id="modal-description"></p>
+        
+        <a id="modal-ig-link" href="#" target="_blank" rel="noopener" class="buy-btn">
+          Заказать в Instagram Direct
+        </a>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
