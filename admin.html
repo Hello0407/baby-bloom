@@ -12,11 +12,13 @@
     .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-main); }
     .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 14px; background: var(--bg-color); }
     textarea.form-control { resize: vertical; min-height: 80px; }
-    
     input[type="file"].form-control { padding: 8px; cursor: pointer; }
-    .btn-submit { width: 100%; background: var(--accent-color); color: #fff; border: none; padding: 14px; border-radius: 30px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-submit { width: 100%; background: var(--accent-color); color: #fff; border: none; padding: 14px; border-radius: 30px; font-size: 15px; font-weight: 600; cursor: pointer; }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-cancel { width: 100%; background: #ccc; color: #000; border: none; padding: 10px; border-radius: 30px; font-size: 14px; margin-top: 8px; cursor: pointer; display: none; }
     .admin-product-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+    .action-btns { display: flex; gap: 8px; }
+    .btn-edit { background: #3b82f6; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
     .btn-delete { background: #ff4d4d; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; }
   </style>
 </head>
@@ -28,8 +30,10 @@
   </header>
 
   <div class="admin-container">
-    <h2 style="margin-bottom: 20px; font-size: 18px;">Добавить новый товар</h2>
+    <h2 id="form-title" style="margin-bottom: 20px; font-size: 18px;">Добавить новый товар</h2>
     <form id="add-product-form">
+      <input type="hidden" id="edit-product-id" value="">
+
       <div class="form-group">
         <label>Название товара</label>
         <input type="text" id="p-title" class="form-control" placeholder="Например: Вязаный комбинезон" required>
@@ -44,6 +48,7 @@
         <label>Статус наличия</label>
         <select id="p-status" class="form-control">
           <option value="in_stock">🟢 В наличии</option>
+          <option value="sale">🔥 По акции</option>
           <option value="preorder">🟡 Предзаказ</option>
         </select>
       </div>
@@ -51,6 +56,7 @@
       <div class="form-group">
         <label>Фотографии товара (необязательно)</label>
         <input type="file" id="p-files" class="form-control" accept="image/*" multiple>
+        <small id="files-note" style="color: #666; font-size: 11px; display: none;">Оставьте пустым, чтобы сохранить текущие фото</small>
       </div>
 
       <div class="form-group">
@@ -59,6 +65,7 @@
       </div>
 
       <button type="submit" id="submit-btn" class="btn-submit">Опубликовать товар</button>
+      <button type="button" id="cancel-btn" class="btn-cancel" onclick="resetForm()">Отмена редактирования</button>
     </form>
   </div>
 
@@ -70,9 +77,9 @@
   <script>
     const SUPABASE_URL = "https://pwkwtulyvwvxddtniidg.supabase.co";
     const SUPABASE_KEY = "sb_publishable_aVaAogTKMyIeSX181EF2nA_CxxU-1eH";
-    
-    // Используем уникальное имя переменной, чтобы избежать конфликта имен
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let allProducts = [];
 
     async function loadAdminProducts() {
       const listEl = document.getElementById('admin-list');
@@ -81,14 +88,51 @@
       if (error) { listEl.innerText = "Ошибка загрузки: " + error.message; return; }
       if (!data || !data.length) { listEl.innerText = "Товаров пока нет"; return; }
 
-      listEl.innerHTML = data.map(p => `
-        <div class="admin-product-item">
-          <div>
-            <strong>${p.title}</strong> — ${p.price} (${p.status === 'in_stock' ? 'В наличии' : 'Предзаказ'})
+      allProducts = data;
+      listEl.innerHTML = data.map(p => {
+        let statusText = 'В наличии';
+        if (p.status === 'sale') statusText = 'По акции';
+        if (p.status === 'preorder') statusText = 'Предзаказ';
+
+        return `
+          <div class="admin-product-item">
+            <div>
+              <strong>${p.title}</strong> — ${p.price} (${statusText})
+            </div>
+            <div class="action-btns">
+              <button class="btn-edit" onclick="editProduct(${p.id})">Изм.</button>
+              <button class="btn-delete" onclick="deleteProduct(${p.id})">Уд.</button>
+            </div>
           </div>
-          <button class="btn-delete" onclick="deleteProduct(${p.id})">Удалить</button>
-        </div>
-      `).join('');
+        `;
+      }).join('');
+    }
+
+    function editProduct(id) {
+      const product = allProducts.find(p => p.id === id);
+      if (!product) return;
+
+      document.getElementById('edit-product-id').value = product.id;
+      document.getElementById('p-title').value = product.title || '';
+      document.getElementById('p-price').value = product.price || '';
+      document.getElementById('p-status').value = product.status || 'in_stock';
+      document.getElementById('p-desc').value = product.description || '';
+
+      document.getElementById('form-title').innerText = "Редактирование товара";
+      document.getElementById('submit-btn').innerText = "Сохранить изменения";
+      document.getElementById('cancel-btn').style.display = "block";
+      document.getElementById('files-note').style.display = "block";
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      document.getElementById('edit-product-id').value = '';
+      document.getElementById('add-product-form').reset();
+      document.getElementById('form-title').innerText = "Добавить новый товар";
+      document.getElementById('submit-btn').innerText = "Опубликовать товар";
+      document.getElementById('cancel-btn').style.display = "none";
+      document.getElementById('files-note').style.display = "none";
     }
 
     document.getElementById('add-product-form').addEventListener('submit', async (e) => {
@@ -97,15 +141,22 @@
       const submitBtn = document.getElementById('submit-btn');
       const fileInput = document.getElementById('p-files');
       const files = fileInput.files;
+      const editId = document.getElementById('edit-product-id').value;
 
       submitBtn.disabled = true;
       submitBtn.innerText = "Сохранение...";
 
       try {
-        const uploadedImageUrls = [];
+        let uploadedImageUrls = [];
+
+        if (editId) {
+          const currentProd = allProducts.find(p => p.id == editId);
+          uploadedImageUrls = currentProd ? (currentProd.images || []) : [];
+        }
 
         if (files && files.length > 0) {
           submitBtn.innerText = "Загрузка фото...";
+          uploadedImageUrls = []; // Перезаписываем фото при выгрузке новых
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileExt = file.name.split('.').pop();
@@ -125,7 +176,7 @@
           }
         }
 
-        const newProduct = {
+        const productData = {
           title: document.getElementById('p-title').value,
           price: document.getElementById('p-price').value,
           status: document.getElementById('p-status').value,
@@ -133,20 +184,29 @@
           description: document.getElementById('p-desc').value
         };
 
-        const { error: insertError } = await supabaseClient.from('products').insert([newProduct]);
+        if (editId) {
+          const { error: updateError } = await supabaseClient
+            .from('products')
+            .update(productData)
+            .eq('id', editId);
+          if (updateError) throw updateError;
+          alert("Товар успешно обновлен!");
+        } else {
+          const { error: insertError } = await supabaseClient
+            .from('products')
+            .insert([productData]);
+          if (insertError) throw insertError;
+          alert("Товар успешно добавлен!");
+        }
 
-        if (insertError) throw insertError;
-
-        alert("Товар успешно добавлен!");
-        document.getElementById('add-product-form').reset();
+        resetForm();
         loadAdminProducts();
 
       } catch (err) {
-        alert("Ошибка добавления: " + err.message);
+        alert("Ошибка: " + err.message);
         console.error(err);
       } finally {
         submitBtn.disabled = false;
-        submitBtn.innerText = "Опубликовать товар";
       }
     });
 
