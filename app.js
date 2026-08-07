@@ -48,21 +48,21 @@ function renderProducts() {
 
   grid.innerHTML = filtered.map(p => {
     let badgeText = 'В наличии';
-    let badgeClass = 'in-stock';
-    if (p.status === 'sale') { badgeText = '🔥 По акции'; badgeClass = 'sale'; }
-    if (p.status === 'preorder') { badgeText = 'Предзаказ'; badgeClass = 'preorder'; }
+    let badgeClass = 'badge-in_stock';
+    if (p.status === 'sale') { badgeText = '🔥 По акции'; badgeClass = 'badge-preorder'; }
+    if (p.status === 'preorder') { badgeText = 'Предзаказ'; badgeClass = 'badge-preorder'; }
 
     const mainImg = (p.images && p.images.length > 0 && p.images[0]) ? p.images[0] : DEFAULT_IMAGE;
 
     return `
       <div class="product-card" onclick='openModalById(${p.id})'>
-        <div class="product-image-container">
+        <div class="card-image-wrap">
           <span class="badge ${badgeClass}">${badgeText}</span>
           <img src="${mainImg}" alt="${p.title || 'Товар'}" loading="lazy" onerror="this.src='${DEFAULT_IMAGE}'">
         </div>
-        <div class="product-info">
-          <div class="product-title">${p.title || ''}</div>
-          <div class="product-price">${p.price || ''}</div>
+        <div class="card-content">
+          <div class="card-title">${p.title || ''}</div>
+          <div class="card-price">${p.price || ''}</div>
         </div>
       </div>
     `;
@@ -134,7 +134,7 @@ window.openModalById = function(id) {
     igLink.href = `https://ig.me/m/${INSTAGRAM_USERNAME}?text=${text}`;
   }
 
-  modal.style.display = 'flex';
+  modal.classList.add('active');
   document.body.style.overflow = 'hidden';
 };
 
@@ -144,7 +144,7 @@ window.closeModal = function(e) {
 
 window.closeModalDirect = function() {
   const modal = document.getElementById('modal');
-  if (modal) modal.style.display = 'none';
+  if (modal) modal.classList.remove('active');
   document.body.style.overflow = 'auto';
 };
 

@@ -118,7 +118,7 @@ body {
 
 .card-image-wrap {
   width: 100%;
-  aspect-ratio: 1 / 1.1;
+  aspect-ratio: 1 / 1;
   position: relative;
   background-color: var(--bg-color);
   overflow: hidden;
