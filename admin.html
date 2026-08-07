@@ -13,7 +13,6 @@
     .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 14px; background: var(--bg-color); }
     textarea.form-control { resize: vertical; min-height: 80px; }
     
-    /* Стили для поля загрузки файлов */
     input[type="file"].form-control {
       padding: 8px;
       cursor: pointer;
@@ -53,10 +52,10 @@
         </select>
       </div>
 
-      <!-- Заменили текстовое поле на выбор файлов из устройства -->
+      <!-- Фото НЕобязательное (убран required) -->
       <div class="form-group">
-        <label>Фотографии товара (выберите файлы с устройства)</label>
-        <input type="file" id="p-files" class="form-control" accept="image/*" multiple required>
+        <label>Фотографии товара (необязательно)</label>
+        <input type="file" id="p-files" class="form-control" accept="image/*" multiple>
       </div>
 
       <div class="form-group">
@@ -78,7 +77,7 @@
     const SUPABASE_KEY = "sb_publishable_aVaAogTKMyIeSX181EF2nA_CxxU-1eH";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Загрузка товаров в список админки
+    // Загрузка товаров
     async function loadAdminProducts() {
       const listEl = document.getElementById('admin-list');
       const { data, error } = await supabase.from('products').select('*').order('id', { ascending: false });
@@ -96,7 +95,7 @@
       `).join('');
     }
 
-    // Обработка отправки формы
+    // Добавление товара
     document.getElementById('add-product-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -104,48 +103,41 @@
       const fileInput = document.getElementById('p-files');
       const files = fileInput.files;
 
-      if (!files.length) {
-        alert("Пожалуйста, выберите хотя бы одно фото!");
-        return;
-      }
-
       submitBtn.disabled = true;
-      submitBtn.innerText = "Загрузка фото...";
+      submitBtn.innerText = "Сохранение товара...";
 
       try {
         const uploadedImageUrls = [];
 
-        // Загрузка каждого выбранного файла в Supabase Storage
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-          const filePath = `${fileName}`;
+        // Если пользователь выгрузил файлы — загружаем их
+        if (files && files.length > 0) {
+          submitBtn.innerText = "Загрузка фото...";
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+            const filePath = `${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(filePath, file);
+            const { error: uploadError } = await supabase.storage
+              .from('product-images')
+              .upload(filePath, file);
 
-          if (uploadError) {
-            throw uploadError;
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(filePath);
+
+            uploadedImageUrls.push(urlData.publicUrl);
           }
-
-          // Получаем публичную ссылку на загруженное фото
-          const { data: urlData } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(filePath);
-
-          uploadedImageUrls.push(urlData.publicUrl);
         }
 
-        submitBtn.innerText = "Сохранение товара...";
-
-        // Сохраняем товар в базе данных
+        // Сохранение товара в базу
         const newProduct = {
           title: document.getElementById('p-title').value,
           price: document.getElementById('p-price').value,
           status: document.getElementById('p-status').value,
-          images: uploadedImageUrls,
+          images: uploadedImageUrls, // Будет пустым массивом, если фото не выбрали
           description: document.getElementById('p-desc').value
         };
 
@@ -153,12 +145,12 @@
 
         if (insertError) throw insertError;
 
-        alert("Товар успешно добавлен с фото!");
+        alert("Товар успешно добавлен!");
         document.getElementById('add-product-form').reset();
         loadAdminProducts();
 
       } catch (err) {
-        alert("Ошибка при загрузке: " + err.message);
+        alert("Ошибка: " + err.message);
         console.error(err);
       } finally {
         submitBtn.disabled = false;
