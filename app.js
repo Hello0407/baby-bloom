@@ -2,15 +2,16 @@ const SUPABASE_URL = "https://pwkwtulyvwvxddtniidg.supabase.co";
 const SUPABASE_KEY = "sb_publishable_aVaAogTKMyIeSX181EF2nA_CxxU-1eH";
 const INSTAGRAM_USERNAME = "baby_bloom_tj_";
 
+// Инициализация Supabase
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Легкая встроенная заглушка (не требует интернета и не лагает)
+// Встроенная SVG-картинка (работает мгновенно, не лагает и не требует сети)
 const DEFAULT_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='100%25' height='100%25' fill='%23f5e2d8'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%234a3b32'%3EBaby Bloom%3C/text%3E%3C/svg%3E";
 
 let allProducts = [];
 let currentFilter = 'all';
 
-// 1. Загрузка данных один раз при старте
+// Загрузка товаров из Supabase
 async function loadProducts() {
   const grid = document.getElementById('products-grid');
   if (!grid) return;
@@ -26,12 +27,12 @@ async function loadProducts() {
     allProducts = data || [];
     renderProducts();
   } catch (err) {
-    console.error(err);
-    grid.innerHTML = '<div class="loading">Ошибка загрузки товаров</div>';
+    console.error('Ошибка Supabase:', err);
+    grid.innerHTML = '<div class="loading">Ошибка загрузки товаров. Проверьте соединение.</div>';
   }
 }
 
-// 2. Мгновенная отрисовка из памяти без лагов
+// Отрисовка товаров
 function renderProducts() {
   const grid = document.getElementById('products-grid');
   if (!grid) return;
@@ -45,10 +46,7 @@ function renderProducts() {
     return;
   }
 
-  // Используем DocumentFragment для плавной работы на слабых телефонах
-  const fragment = document.createDocumentFragment();
-
-  filtered.forEach(p => {
+  grid.innerHTML = filtered.map(p => {
     let badgeText = 'В наличии';
     let badgeClass = 'in-stock';
     if (p.status === 'sale') { badgeText = '🔥 По акции'; badgeClass = 'sale'; }
@@ -56,47 +54,48 @@ function renderProducts() {
 
     const mainImg = (p.images && p.images.length > 0 && p.images[0]) ? p.images[0] : DEFAULT_IMAGE;
 
-    const card = document.createElement('div');
-    card.className = 'product-card';
-    card.onclick = () => openModal(p);
-    
-    card.innerHTML = `
-      <div class="product-image-container">
-        <span class="badge ${badgeClass}">${badgeText}</span>
-        <img src="${mainImg}" alt="${p.title}" loading="lazy" onerror="this.src='${DEFAULT_IMAGE}'">
-      </div>
-      <div class="product-info">
-        <div class="product-title">${p.title}</div>
-        <div class="product-price">${p.price}</div>
+    return `
+      <div class="product-card" onclick='openModalById(${p.id})'>
+        <div class="product-image-container">
+          <span class="badge ${badgeClass}">${badgeText}</span>
+          <img src="${mainImg}" alt="${p.title || 'Товар'}" loading="lazy" onerror="this.src='${DEFAULT_IMAGE}'">
+        </div>
+        <div class="product-info">
+          <div class="product-title">${p.title || ''}</div>
+          <div class="product-price">${p.price || ''}</div>
+        </div>
       </div>
     `;
-    fragment.appendChild(card);
-  });
-
-  grid.innerHTML = '';
-  grid.appendChild(fragment);
+  }).join('');
 }
 
-// 3. Быстрое переключение категорий
+// Фильтрация товаров по кнопкам
 window.filterProducts = function(status, btnElement) {
   currentFilter = status;
   
-  // Переключение активной кнопки
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  if (btnElement) btnElement.classList.add('active');
+  const buttons = document.querySelectorAll('.tab-btn');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  
+  if (btnElement) {
+    btnElement.classList.add('active');
+  }
 
   renderProducts();
 };
 
-// 4. Логика модального окна
-window.openModal = function(product) {
+// Открытие модального окна
+window.openModalById = function(id) {
+  const product = allProducts.find(p => p.id === id);
+  if (!product) return;
+
   const modal = document.getElementById('modal');
   if (!modal) return;
 
   const mainImg = (product.images && product.images.length > 0) ? product.images[0] : DEFAULT_IMAGE;
-  document.getElementById('modal-main-img').src = mainImg;
+  const modalImg = document.getElementById('modal-main-img');
+  if (modalImg) modalImg.src = mainImg;
 
-  // Значок
+  // Значок статуса
   const badgeEl = document.getElementById('modal-badge');
   if (badgeEl) {
     let badgeText = 'В наличии';
@@ -105,9 +104,14 @@ window.openModal = function(product) {
     badgeEl.innerText = badgeText;
   }
 
-  document.getElementById('modal-title').innerText = product.title || '';
-  document.getElementById('modal-price').innerText = product.price || '';
-  document.getElementById('modal-description').innerText = product.description || 'Описание отсутствует';
+  const titleEl = document.getElementById('modal-title');
+  if (titleEl) titleEl.innerText = product.title || '';
+
+  const priceEl = document.getElementById('modal-price');
+  if (priceEl) priceEl.innerText = product.price || '';
+
+  const descEl = document.getElementById('modal-description');
+  if (descEl) descEl.innerText = product.description || 'Описание отсутствует';
 
   // Галерея миниатюр
   const thumbsContainer = document.getElementById('modal-thumbnails');
@@ -117,13 +121,13 @@ window.openModal = function(product) {
       product.images.forEach(imgUrl => {
         const thumb = document.createElement('img');
         thumb.src = imgUrl;
-        thumb.onclick = () => { document.getElementById('modal-main-img').src = imgUrl; };
+        thumb.onclick = () => { if (modalImg) modalImg.src = imgUrl; };
         thumbsContainer.appendChild(thumb);
       });
     }
   }
 
-  // Ссылка в Instagram Direct
+  // Ссылка в Instagram
   const igLink = document.getElementById('modal-ig-link');
   if (igLink) {
     const text = encodeURIComponent(`Здравствуйте! Хочу заказать: "${product.title}" (${product.price})`);
@@ -144,5 +148,5 @@ window.closeModalDirect = function() {
   document.body.style.overflow = 'auto';
 };
 
-// Старт при загрузке
+// Запуск при загрузке страницы
 document.addEventListener('DOMContentLoaded', loadProducts);
