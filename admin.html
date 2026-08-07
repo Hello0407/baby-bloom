@@ -13,11 +13,7 @@
     .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 14px; background: var(--bg-color); }
     textarea.form-control { resize: vertical; min-height: 80px; }
     
-    input[type="file"].form-control {
-      padding: 8px;
-      cursor: pointer;
-    }
-
+    input[type="file"].form-control { padding: 8px; cursor: pointer; }
     .btn-submit { width: 100%; background: var(--accent-color); color: #fff; border: none; padding: 14px; border-radius: 30px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
     .admin-product-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
@@ -52,7 +48,6 @@
         </select>
       </div>
 
-      <!-- Фото НЕобязательное (убран required) -->
       <div class="form-group">
         <label>Фотографии товара (необязательно)</label>
         <input type="file" id="p-files" class="form-control" accept="image/*" multiple>
@@ -75,15 +70,16 @@
   <script>
     const SUPABASE_URL = "https://pwkwtulyvwvxddtniidg.supabase.co";
     const SUPABASE_KEY = "sb_publishable_aVaAogTKMyIeSX181EF2nA_CxxU-1eH";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    // Используем уникальное имя переменной, чтобы избежать конфликта имен
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Загрузка товаров
     async function loadAdminProducts() {
       const listEl = document.getElementById('admin-list');
-      const { data, error } = await supabase.from('products').select('*').order('id', { ascending: false });
+      const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending: false });
       
-      if (error) { listEl.innerText = "Ошибка загрузки"; return; }
-      if (!data.length) { listEl.innerText = "Товаров пока нет"; return; }
+      if (error) { listEl.innerText = "Ошибка загрузки: " + error.message; return; }
+      if (!data || !data.length) { listEl.innerText = "Товаров пока нет"; return; }
 
       listEl.innerHTML = data.map(p => `
         <div class="admin-product-item">
@@ -95,7 +91,6 @@
       `).join('');
     }
 
-    // Добавление товара
     document.getElementById('add-product-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -104,44 +99,41 @@
       const files = fileInput.files;
 
       submitBtn.disabled = true;
-      submitBtn.innerText = "Сохранение товара...";
+      submitBtn.innerText = "Сохранение...";
 
       try {
         const uploadedImageUrls = [];
 
-        // Если пользователь выгрузил файлы — загружаем их
         if (files && files.length > 0) {
           submitBtn.innerText = "Загрузка фото...";
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileExt = file.name.split('.').pop();
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-            const filePath = `${fileName}`;
 
-            const { error: uploadError } = await supabase.storage
+            const { error: uploadError } = await supabaseClient.storage
               .from('product-images')
-              .upload(filePath, file);
+              .upload(fileName, file);
 
             if (uploadError) throw uploadError;
 
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = supabaseClient.storage
               .from('product-images')
-              .getPublicUrl(filePath);
+              .getPublicUrl(fileName);
 
             uploadedImageUrls.push(urlData.publicUrl);
           }
         }
 
-        // Сохранение товара в базу
         const newProduct = {
           title: document.getElementById('p-title').value,
           price: document.getElementById('p-price').value,
           status: document.getElementById('p-status').value,
-          images: uploadedImageUrls, // Будет пустым массивом, если фото не выбрали
+          images: uploadedImageUrls,
           description: document.getElementById('p-desc').value
         };
 
-        const { error: insertError } = await supabase.from('products').insert([newProduct]);
+        const { error: insertError } = await supabaseClient.from('products').insert([newProduct]);
 
         if (insertError) throw insertError;
 
@@ -150,7 +142,7 @@
         loadAdminProducts();
 
       } catch (err) {
-        alert("Ошибка: " + err.message);
+        alert("Ошибка добавления: " + err.message);
         console.error(err);
       } finally {
         submitBtn.disabled = false;
@@ -158,10 +150,9 @@
       }
     });
 
-    // Удаление товара
     async function deleteProduct(id) {
       if (confirm("Точно удалить этот товар?")) {
-        await supabase.from('products').delete().eq('id', id);
+        await supabaseClient.from('products').delete().eq('id', id);
         loadAdminProducts();
       }
     }
