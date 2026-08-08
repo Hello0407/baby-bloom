@@ -8,7 +8,7 @@
   --border-color: #EFE8DF;
   --badge-stock-bg: #E8F0E6;  /* Мягко-зеленый для "В наличии" */
   --badge-stock-text: #3D6B42;
-  --badge-pre-bg: #FFF3E0;    /* Мягко-оранжевый для "Предзаказа" */
+  --badge-pre-bg: #FFF3E0;    /* Мягко-оранжевый для "Под заказ" */
   --badge-pre-text: #B56200;
 }
 

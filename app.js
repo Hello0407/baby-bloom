@@ -67,7 +67,7 @@ function renderProducts() {
     let badgeText = 'В наличии';
     let badgeClass = 'badge-in_stock';
     if (p.status === 'sale') { badgeText = '🔥 По акции'; badgeClass = 'badge-preorder'; }
-    if (p.status === 'preorder') { badgeText = 'Предзаказ'; badgeClass = 'badge-preorder'; }
+    if (p.status === 'preorder') { badgeText = 'Под заказ'; badgeClass = 'badge-preorder'; }
 
     const mainImg = (p.images && p.images.length > 0 && p.images[0]) ? p.images[0] : DEFAULT_IMAGE;
     const sizesText = formatSizesText(p.sizes);
@@ -119,7 +119,7 @@ window.openModalById = function(id) {
   if (badgeEl) {
     let badgeText = 'В наличии';
     if (product.status === 'sale') badgeText = '🔥 По акции';
-    if (product.status === 'preorder') badgeText = 'Предзаказ';
+    if (product.status === 'preorder') badgeText = 'Под заказ';
     badgeEl.innerText = badgeText;
   }
 
